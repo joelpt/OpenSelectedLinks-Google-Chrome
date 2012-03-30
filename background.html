@@ -1,13 +1,16 @@
 <script type="text/javascript">
 
+    var g_currentTab;
+
     function openAllUrls(info, tab)
     {
-          chrome.tabs.sendRequest(tab.id, "openSelectedUrls", openUrls);
+        g_currentTab = tab;
+        chrome.tabs.sendRequest(tab.id, "openSelectedUrls", openUrls);
     }
 
     function openUrls(params)
     {
-        urls = params.urls.sort();
+        urls = eliminateDuplicates(params.urls);
         fromUrl = params.fromUrl;
 
         var baseUrl = fromUrl.replace(/#.+$/, '');
@@ -15,28 +18,27 @@
         var skippedAnchors = 0;
         var openedUrls = 0;
 
-        var lastUrl = null;
+        var insertAtIndex = g_currentTab.index + 1;
+        var openerTabId = g_currentTab.id;
+
+
         for (var i in urls)
         {
             url = urls[i]
-            if (url != lastUrl)
+            var relativeUrl = url.replace(baseUrl, '');
+            if (url.match("^javascript:.*") || relativeUrl.match("^#$"))
             {
-                var relativeUrl = url.replace(baseUrl, '');
-                if (url.match("^javascript:.*") || relativeUrl.match("^#$"))
-                {
-                    // Ignore links with href of 'javascript:....' or '#'
-                    continue;
-                }
-                 if (relativeUrl.match("^#"))
-                 {
-                    // Don't open links which are #anchors within the current page
-                    skippedAnchors += 1;
-                    continue;
-                 }
-                openUrl(url);
-                lastUrl = url;
-                openedUrls += 1;
+                // Ignore links with href of 'javascript:....' or '#'
+                continue;
             }
+             if (relativeUrl.match("^#"))
+             {
+                // Don't open links which are #anchors within the current page
+                skippedAnchors += 1;
+                continue;
+             }
+            openUrl(url, openerTabId, insertAtIndex++);
+            openedUrls += 1;
         }
 
         if (openedUrls == 0)
@@ -52,15 +54,41 @@
         }
     }
 
-    function openUrl(url)
+    function openUrl(url, openerTabId, index)
     {
-        var prop = {
-            url: url,
-            selected: false
+        if (openerTabId)
+        {
+            var prop = {
+                url: url,
+                index: index,
+                openerTabId: openerTabId,
+                active: false
+            }
+        }
+        else
+        {
+            var prop = {
+                url: url,
+                active: false
+            }
         }
         chrome.tabs.create(prop);
     }
 
+    function eliminateDuplicates(arr)
+    {
+        var i, len = arr.length,
+            out = [],
+            obj = {};
+
+        for (i = 0; i < len; i++) {
+            obj[arr[i]] = 0;
+        }
+        for (i in obj) {
+            out.push(i);
+        }
+        return out;
+    }
 
     chrome.contextMenus.create({
         "title": "Open selected links in new tabs",
