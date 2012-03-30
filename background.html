@@ -1,0 +1,71 @@
+<script type="text/javascript">
+
+    function openAllUrls(info, tab)
+    {
+          chrome.tabs.sendRequest(tab.id, "openSelectedUrls", openUrls);
+    }
+
+    function openUrls(params)
+    {
+        urls = params.urls.sort();
+        fromUrl = params.fromUrl;
+
+        var baseUrl = fromUrl.replace(/#.+$/, '');
+
+        var skippedAnchors = 0;
+        var openedUrls = 0;
+
+        var lastUrl = null;
+        for (var i in urls)
+        {
+            url = urls[i]
+            if (url != lastUrl)
+            {
+                var relativeUrl = url.replace(baseUrl, '');
+                if (url.match("^javascript:.*") || relativeUrl.match("^#$"))
+                {
+                    // Ignore links with href of 'javascript:....' or '#'
+                    continue;
+                }
+                 if (relativeUrl.match("^#"))
+                 {
+                    // Don't open links which are #anchors within the current page
+                    skippedAnchors += 1;
+                    continue;
+                 }
+                openUrl(url);
+                lastUrl = url;
+                openedUrls += 1;
+            }
+        }
+
+        if (openedUrls == 0)
+        {
+            if (skippedAnchors > 0)
+            {
+                alert('No tabs were opened because all the links selected go to other sections of this page (#anchor links).');
+            }
+            else
+            {
+                alert('No links found in selection.');
+            }
+        }
+    }
+
+    function openUrl(url)
+    {
+        var prop = {
+            url: url,
+            selected: false
+        }
+        chrome.tabs.create(prop);
+    }
+
+
+    chrome.contextMenus.create({
+        "title": "Open selected links in new tabs",
+        "contexts": ["selection"],
+        "onclick": openAllUrls
+    });
+
+</script>
